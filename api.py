@@ -26,11 +26,18 @@ CREATE TABLE IF NOT EXISTS students(
     name TEXT,
     age INTEGER,
     grade TEXT,
-    email TEXT
+    email TEXT,
+    password TEXT
 )
 """)
 
 conn.commit()
+
+cursor.execute("PRAGMA table_info(students)")
+columns = [col[1] for col in cursor.fetchall()]
+if "password" not in columns:
+    cursor.execute("ALTER TABLE students ADD COLUMN password TEXT")
+    conn.commit()
 
 cursor.execute("""
 CREATE TABLE IF NOT EXISTS attendance(
@@ -162,11 +169,10 @@ def update_student(student_id: int, model: student_register_model):
     }
     
 
-@app.delete("/students{student_id}")
+@app.delete("/students/{student_id}")
 def delete_student(student_id: int):
-    
     cursor.execute(
-        "SELECT  * FROM students WHERE id = ?",
+        "SELECT * FROM students WHERE id = ?",
         (student_id,)
     )
     row = cursor.fetchone()
@@ -182,7 +188,7 @@ def delete_student(student_id: int):
     conn.commit()
     return {
         "message": "Student deleted successfully"
-    }    
+    }
 
 
 
@@ -414,8 +420,8 @@ def get_results(student_id: int):
     results = []
     
     for row in rows:
-        percentage = (row[3] / row[4]) *100
-        
+        percentage = (row[3] / row[4]) * 100
+
         if percentage >= 90:
             grade = "A+"
         elif percentage >= 80:
@@ -423,12 +429,12 @@ def get_results(student_id: int):
         elif percentage >= 70:
             grade = "B"
         elif percentage >= 60:
-            grade = "c"
+            grade = "C"
         elif percentage >= 50:
             grade = "D"
         else:
             grade = "F"
-            
+
         results.append({
             "id": row[0],
             "student_id": row[1],
@@ -437,7 +443,9 @@ def get_results(student_id: int):
             "total_marks": row[4],
             "percentage": percentage,
             "grade": grade
-        })                                   
+        })
+
+    return results
         
 
 @app.get("/attendance_percentage/{student_id}")
@@ -507,43 +515,41 @@ def overall_result(student_id: int):
     
     cursor.execute(
         """
-        SELECT subjects, marks, total_marks
+        SELECT subject, marks, total_marks
         FROM results
         WHERE student_id = ?
         """,
         (student_id,)
-        
-    )    
+    )
     rows = cursor.fetchall()
-    
+
     if not rows:
         raise HTTPException(
             status_code=404,
             detail="Result not found"
         )
-    
-    
+
     total_marks_obtained = 0
     total_marks = 0
-    
+
     subjects = []
-    
+
     for row in rows:
         subject = row[0]
         marks = row[1]
         maximum_marks = row[2]
-        
-        total_marks_obtained +=marks
+
+        total_marks_obtained += marks
         total_marks += maximum_marks
-        
+
         subjects.append({
             "subject": subject,
             "marks": marks,
             "total_marks": maximum_marks
         })
-    
+
     percentage = (total_marks_obtained / total_marks) * 100
-    
+
     if percentage >= 90:
         grade = "A+"
     elif percentage >= 80:
@@ -556,16 +562,15 @@ def overall_result(student_id: int):
         grade = "D"
     else:
         grade = "F"
-    
-    
+
     return {
-        "stuent_id": student_id,
+        "student_id": student_id,
         "subjects": subjects,
         "total_mark_obtained": total_marks_obtained,
         "total_marks": total_marks,
         "overall_percentage": round(percentage, 2),
         "overall_grade": grade
-    }                        
+    }
 
 
         

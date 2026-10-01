@@ -1,3 +1,7 @@
+import os
+import threading
+import time
+
 import streamlit as st
 import requests
 import pandas as pd
@@ -5,7 +9,43 @@ from datetime import date
 
 
 
-API_URL = "http://127.0.0.1:8000"
+def _start_backend_if_needed():
+    if getattr(_start_backend_if_needed, "started", False):
+        return
+
+    try:
+        import uvicorn
+        from api import app as api_app
+
+        config = uvicorn.Config(
+            api_app,
+            host="127.0.0.1",
+            port=8000,
+            log_level="warning",
+            access_log=False,
+        )
+        server = uvicorn.Server(config)
+
+        def run_server():
+            server.run()
+
+        thread = threading.Thread(target=run_server, daemon=True)
+        thread.start()
+
+        for _ in range(50):
+            if server.started:
+                break
+            time.sleep(0.1)
+
+        _start_backend_if_needed.started = True
+
+    except Exception:
+        _start_backend_if_needed.started = True
+
+
+_start_backend_if_needed()
+
+API_URL = os.environ.get("API_URL", "http://127.0.0.1:8000")
 
 st.set_page_config(
     page_title="Student Management System",
